@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Avaliação Unificado</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
+    <style id="main-styles">
+        /* --- ESTILOS COMPARTILHADOS --- */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: #0c0c0c; /* Padrão mais escuro */
+            color: #dcdcdc;
+            font-family: 'VT323', monospace; 
+            font-size: 22px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Efeito de scanline (aplicado às telas secundárias) */
+        body.scanline::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+        
+        @keyframes flicker {
+            0% { opacity: 0.2; }
+            20% { opacity: 0.8; }
+            40% { opacity: 0.3; }
+            60% { opacity: 0.9; }
+            80% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .main-container {
+            padding: 2rem;
+            max-width: 800px;
+            width: 100%; /* Ajuste para o primeiro bloco */
+        }
+        
+        /* Estilo da cruz no canto (compartilhado) */
+        .bottom-cross {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            width: 50px;
+            height: 80px;
+            color: #ccc;
+            opacity: 0.7;
+            visibility: hidden; 
+        }
+        .bottom-cross svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor;
+        }
+
+        /* --- ESTILOS DO "TERMINAL DE CARREGAMENTO" (primeira.html) --- */
+        .terminal-container {
+            padding: 2rem;
+            width: 100%;
+            height: 100vh;
+        }
+        .terminal-line {
+            margin: 0;
+            white-space: pre-wrap;
+            display: none;
+            text-align: left;
+        }
+        .terminal-line:first-child {
+            display: block;
+        }
+        .cursor {
+            display: inline-block;
+            background-color: #dcdcdc;
+            width: 12px;
+            height: 1.5rem;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            visibility: hidden;
+        }
+        @keyframes blink {
+            from, to { background-color: transparent; }
+            50% { background-color: #dcdcdc; }
+        }
+
+        /* --- ESTILOS DO "MENU PRINCIPAL" (segunda.html) --- */
+        body.menu {
+            font-size: 28px;
+            background-color: #111;
+        }
+        body.menu .cross-icon {
+            width: 120px;
+            height: 200px;
+            margin-bottom: 40px;
+            color: #ccc;
+        }
+        .cross-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor;
+        }
+        .menu-option {
+            cursor: pointer;
+            text-decoration: none;
+            color: #dcdcdc;
+            transition: color 0.3s;
+            margin: 10px 0;
+            display: block;
+        }
+        .menu-option:hover {
+            color: #fff;
+            text-shadow: 0 0 5px #fff;
+        }
+        /* Ícone de engrenagem */
+        .settings-icon {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            fill: #888;
+            transition: fill 0.3s, transform 0.5s;
+            z-index: 100;
+        }
+        .settings-icon:hover {
+            fill: #bbb;
+            transform: rotate(90deg);
+        }
+        /* Pop-up da oração */
+        .prayer-popup {
+            display: none;
+            position: absolute;
+            bottom: 70px;
+            left: 20px;
+            background-color: rgba(10, 10, 10, 0.9);
+            border: 1px solid #555;
+            padding: 15px;
+            width: 300px;
+            font-size: 16px;
+            text-align: left;
+            line-height: 1.4;
+            color: #ccc;
+            z-index: 99;
+        }
+        .prayer-popup h4 {
+            margin-top: 0;
+            border-bottom: 1px solid #555;
+            padding-bottom: 5px;
+            font-size: 18px;
+        }
+        /* Texto de copyright */
+        .copyright-text {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 14px;
+            color: #666;
+            max-width: 300px;
+            text-align: right;
+        }
+
+        /* --- ESTILOS DAS "TELAS DE INTRODUÇÃO E QUESTÃO" (terceira.html em diante) --- */
+        body.intro, body.question {
+            font-size: 28px;
+            background-color: #111;
+        }
+        .text-line {
+            visibility: hidden;
+            margin: 20px 0;
+        }
+        .text-line.visible {
+            visibility: visible;
+        }
+        .text-line.title {
+            font-size: 42px;
+            margin-bottom: 40px;
+        }
+        #proceed-btn {
+            visibility: hidden;
+            margin-top: 60px;
+            font-size: 36px;
+            text-decoration: none;
+            color: #dcdcdc;
+            display: block;
+        }
+        #proceed-btn.visible {
+            visibility: visible;
+        }
+        #proceed-btn:hover {
+            color: #fff;
+            text-shadow: 0 0 8px #fff;
+        }
+        .options-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 4rem;
+            visibility: hidden;
+            font-size: 2.5rem;
+        }
+        .option {
+            font-size: 2.5rem;
+            color: #dcdcdc;
+            text-decoration: none;
+            cursor: pointer;
+            padding: 1rem;
+            transition: color 0.3s;
+        }
+        .option:hover {
+            color: #fff;
+            text-shadow: 0 0 10px #fff;
+        }
+
+        /* --- ESTILOS DA TELA DE "CAPÍTULO" (quarta.html) --- */
+        body.chapter {
+            background-color: #000;
+        }
+        .chapter-number {
+            font-size: 3rem;
+            color: #c00;
+            letter-spacing: 1.5rem;
+            margin-bottom: 1rem;
+            visibility: hidden;
+        }
+        .chapter-title {
+            font-family: 'Libre Baskerville', serif;
+            font-size: 14vw;
+            font-weight: bold;
+            color: transparent;
+            background: repeating-linear-gradient(
+                45deg,
+                #900,
+                #900 1px,
+                #c00 1px,
+                #c00 2px
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.7);
+            visibility: hidden;
+        }
+
+    </style>
+</head>
+<body>
+
+    <main id="app-container">
+        </main>
+
+    <svg id="settings-btn" class="settings-icon" viewBox="0 0 24 24" style="display: none;">
+        <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+    </svg>
+    <div id="prayer-popup" class="prayer-popup" style="display: none;">
+        <h4>Pai Nosso (Aramaico)</h4>
+        <p>
+            Avvon d-bish-maiya, nith-qaddash shmokh.
+            Tih-te malkuthokh. Nih-we çiw-yanokh, ai-kanna d-bish-maiya ap b-arha.
+            Haw-lan lakh-ma d-sun-qa-nan yoo-mana.
+            Wash-buq lan kho-bain, ai-kanna d-ap khnan shwo-qan l-khaya-wain.
+            Oo-la takh-lan l-nis-yoona, illa paç-çan min bisha.
+            Mid-tul d-dee-lokh hai malkutha oo-khaila oo-tish-bookh-ta l-ah-lam al-min.
+            Amen.
+        </p>
+    </div>
+    <footer class="copyright-text" style="display: none;">
+        Este programa é protegido por Copyright e propriedade do Arquivo Apostólico dos FUTUREBOTS 2025. O uso deste programa é por sua conta e risco espiritual.
+    </footer>
+    <div class="bottom-cross" id="bottom-cross" style="display: none;">
+        <svg viewBox="0 0 100 160">
+            <rect x="37.5" y="0" width="25" height="160"></rect>
+            <rect x="0" y="35" width="100" height="25"></rect>
+        </svg>
+    </div>
+
+
+    <script>
+        const appContainer = document.getElementById('app-container');
+        const settingsBtn = document.getElementById('settings-btn');
+        const prayerPopup = document.getElementById('prayer-popup');
+        const copyrightText = document.querySelector('.copyright-text');
+        const bottomCross = document.getElementById('bottom-cross');
+
+        // --- Variáveis de Estado para o Flujo ---
+        let currentPage = 'terminal';
+        
+        // --- Definição do Conteúdo HTML para cada "Página" ---
+        const pages = {
+            'terminal': {
+                bodyClass: '',
+                content: `
+                    <div class="terminal-container">
+                        <p class="terminal-line">Evaluation</p>
+                        <p class="terminal-line">Copyright (c) 1991 - 2025, FUTUREBOTS Apostolic Software Team</p>
+                        <p class="terminal-line" style="margin-top: 20px;">>Loading Emulator...</p>
+                        <p class="terminal-line">>Setting up Database....</p>
+                        <p class="terminal-line" style="margin-top: 20px;">Launching: Evaluation_v_1.000.1</p>
+                        <p class="terminal-line">System parameters: Set</p>
+                        <p class="terminal-line">BIOS: Set</p>
+                        <p class="terminal-line">Display UI: Set</p>
+                        <p class="terminal-line" style="margin-top: 20px;">Communication Tool initialised successfully</p>
+                        <p class="terminal-line">Conn_tool_ver_4.111.56382f</p>
+                        <p class="terminal-line" style="margin-top: 20px;">RUN<span class="cursor"></span></p>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.terminal.bodyClass;
+                    const lines = document.querySelectorAll('.terminal-line');
+                    const cursor = document.querySelector('.cursor');
+                    let currentLineIndex = 1; 
+
+                    const revealNextLine = () => {
+                        if (currentLineIndex < lines.length) {
+                            lines[currentLineIndex].style.display = 'block';
+                            currentLineIndex++;
+                        } else {
+                            clearInterval(intervalId);
+                            if(cursor) cursor.style.visibility = 'visible';
+                            setTimeout(() => {
+                                gotoNext('menu'); // Redireciona para o Menu Principal
+                            }, 2000); 
+                        }
+                    };
+                    const intervalId = setInterval(revealNextLine, 3000);
+                }
+            },
+            
+            'menu': {
+                bodyClass: 'menu scanline',
+                content: `
+                    <div class="main-container">
+                        <div class="cross-icon">
+                            <svg viewBox="0 0 100 160">
+                                <rect x="37.5" y="0" width="25" height="160"></rect>
+                                <rect x="0" y="35" width="100" height="25"></rect>
+                            </svg>
+                        </div>
+                        <a id="begin-eval" class="menu-option" href="#">Iniciar Avaliação</a>
+                        <a id="exit-program" class="menu-option" href="#">Sair do Programa</a>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.menu.bodyClass;
+                    settingsBtn.style.display = 'block';
+                    copyrightText.style.display = 'block';
+
+                    const beginBtn = document.getElementById('begin-eval');
+                    const exitBtn = document.getElementById('exit-program');
+                    
+                    beginBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        gotoNext('intro'); // Redireciona para Introdução
+                    });
+
+                    exitBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.body.innerHTML = '';
+                        document.body.style.backgroundColor = '#000';
+                    });
+                    
+                    settingsBtn.onclick = (event) => {
+                        event.stopPropagation(); 
+                        const isDisplayed = prayerPopup.style.display === 'block';
+                        prayerPopup.style.display = isDisplayed ? 'none' : 'block';
+                    };
+                    
+                    document.body.onclick = () => {
+                        if (prayerPopup.style.display === 'block') {
+                            prayerPopup.style.display = 'none';
+                        }
+                    };
+                }
+            },
+
+            'intro': {
+                bodyClass: 'intro scanline',
+                content: `
+                    <div class="main-container">
+                        <h1 class="text-line title">Bem-vindo à Avaliação</h1>
+                        <p class="text-line">Em breve, uma série de Perguntas lhe será feita. Os Tópicos abordados não são importantes agora e é importante que você mantenha sua Mente limpa.</p>
+                        <p class="text-line">Por favor, leve o tempo que for necessário e responda cada pergunta com sinceridade.</p>
+                        <p class="text-line">Clique abaixo para Começar.</p>
+                        <a id="proceed-btn" href="#">PROSSEGUIR</a>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.intro.bodyClass;
+                    settingsBtn.style.display = 'none';
+                    copyrightText.style.display = 'none';
+                    prayerPopup.style.display = 'none';
+                    bottomCross.style.display = 'block';
+
+                    const lines = document.querySelectorAll('.text-line');
+                    const proceedBtn = document.getElementById('proceed-btn');
+                    let currentIndex = 0;
+
+                    function showNextLine() {
+                        if (currentIndex < lines.length) {
+                            const currentLine = lines[currentIndex];
+                            currentLine.classList.add('visible');
+                            setTimeout(() => {
+                                currentIndex++;
+                                showNextLine();
+                            }, 4000);
+                        } else {
+                            proceedBtn.classList.add('visible');
+                            proceedBtn.onclick = (e) => {
+                                e.preventDefault();
+                                gotoNext('chapter1');
+                            };
+                        }
+                    }
+                    setTimeout(showNextLine, 5000);
+                }
+            },
+
+            'chapter1': {
+                bodyClass: 'chapter scanline',
+                content: `
+                    <div class="main-container">
+                        <div class="chapter-number">- I -</div>
+                        <div class="chapter-title">EU</div>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.chapter1.bodyClass;
+                    bottomCross.style.display = 'block';
+
+                    const chapterNumber = document.querySelector('.chapter-number');
+                    const chapterTitle = document.querySelector('.chapter-title');
+                    const cross = document.querySelector('.bottom-cross');
+
+                    setTimeout(() => {
+                        if (chapterNumber) chapterNumber.style.visibility = 'visible';
+                        if (cross) cross.style.visibility = 'visible';
+
+                        setTimeout(() => {
+                            if (chapterTitle) chapterTitle.style.visibility = 'visible';
+                        }, 1000);
+
+                        setTimeout(() => {
+                            gotoNext('question1');
+                        }, 7000);
+                    }, 3000);
+                }
+            },
+            
+            'question1': {
+                bodyClass: 'question scanline',
+                content: `
+                    <div class="main-container">
+                        <p class="question-text" id="line1">Primeiro, algumas perguntas sobre você.</p>
+                        <p class="question-text" id="line2">Descreva-se honestamente, usando uma das seleções abaixo.</p>
+                        
+                        <div class="options-container" id="options">
+                            <a class="option" href="#" data-next-page="question2">Honesto</a>
+                            <a class="option" href="#" data-next-page="question2">Desonesto</a>
+                        </div>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.question1.bodyClass;
+                    bottomCross.style.display = 'block';
+
+                    const line1 = document.getElementById('line1');
+                    const line2 = document.getElementById('line2');
+                    const options = document.getElementById('options');
+                    
+                    const setup = () => {
+                        line1.style.visibility = 'visible';
+                        bottomCross.style.visibility = 'visible';
+
+                        setTimeout(() => {
+                            line2.style.visibility = 'visible';
+
+                            setTimeout(() => {
+                                options.style.visibility = 'visible';
+                                document.querySelectorAll('.option').forEach(option => {
+                                    option.onclick = (e) => {
+                                        e.preventDefault();
+                                        gotoNext(e.target.dataset.nextPage);
+                                    };
+                                });
+                            }, 4000);
+                        }, 4000);
+                    };
+                    setTimeout(setup, 3000);
+                }
+            },
+
+            'question2': {
+                bodyClass: 'question scanline',
+                content: `
+                    <div class="main-container">
+                        <p class="question-text" id="line1">Pense com cuidado agora.</p>
+                        <p class="question-text" id="line2">Com que frequência você acha que as pessoas com quem você mais se importa, pensam em você?</p>
+                        
+                        <div class="options-container" id="options">
+                            <a class="option" href="#" data-next-page="question3">Sempre</a>
+                            <a class="option" href="#" data-next-page="question3">Nunca</a>
+                        </div>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.question2.bodyClass;
+                    bottomCross.style.display = 'block';
+
+                    const line1 = document.getElementById('line1');
+                    const line2 = document.getElementById('line2');
+                    const options = document.getElementById('options');
+                    
+                    const setup = () => {
+                        line1.style.visibility = 'visible';
+                        bottomCross.style.visibility = 'visible';
+
+                        setTimeout(() => {
+                            line2.style.visibility = 'visible';
+
+                            setTimeout(() => {
+                                options.style.visibility = 'visible';
+                                document.querySelectorAll('.option').forEach(option => {
+                                    option.onclick = (e) => {
+                                        e.preventDefault();
+                                        gotoNext(e.target.dataset.nextPage);
+                                    };
+                                });
+                            }, 4000);
+                        }, 4000);
+                    };
+                    setTimeout(setup, 3000);
+                }
+            },
+            
+            'question3': {
+                bodyClass: 'question scanline',
+                content: `
+                    <div class="main-container">
+                        <p class="question-text" id="line1">Interessante...</p>
+                        <p class="question-text" id="line2">Você já sentiu que o mundo seria um lugar muito melhor se ele girasse em torno de você?</p>
+                        
+                        <div class="options-container" id="options">
+                            <a class="option" href="#" data-next-page="question4">Com certeza</a>
+                            <a class="option" href="#" data-next-page="question4">Não</a>
+                        </div>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.question3.bodyClass;
+                    bottomCross.style.display = 'block';
+
+                    const line1 = document.getElementById('line1');
+                    const line2 = document.getElementById('line2');
+                    const options = document.getElementById('options');
+                    
+                    const setup = () => {
+                        line1.style.visibility = 'visible';
+                        bottomCross.style.visibility = 'visible';
+
+                        setTimeout(() => {
+                            line2.style.visibility = 'visible';
+
+                            setTimeout(() => {
+                                options.style.visibility = 'visible';
+                                document.querySelectorAll('.option').forEach(option => {
+                                    option.onclick = (e) => {
+                                        e.preventDefault();
+                                        gotoNext(e.target.dataset.nextPage);
+                                    };
+                                });
+                            }, 4000);
+                        }, 4000);
+                    };
+                    setTimeout(setup, 3000);
+                }
+            },
+
+            'question4': {
+                bodyClass: 'question scanline',
+                content: `
+                    <div class="main-container">
+                        <p class="question-text" id="line1">Uma Última Pergunta.</p>
+                        <p class="question-text" id="line2">Com que frequência você sente que alguém está te observando, mesmo quando está sozinho?</p>
+                        
+                        <div class="options-container" id="options">
+                            <a class="option" href="#" data-next-page="menu">Raramente</a>
+                            <a class="option" href="#" data-next-page="menu">Sempre</a>
+                        </div>
+                    </div>
+                `,
+                script: (gotoNext) => {
+                    document.body.className = pages.question4.bodyClass;
+                    bottomCross.style.display = 'block';
+
+                    const line1 = document.getElementById('line1');
+                    const line2 = document.getElementById('line2');
+                    const options = document.getElementById('options');
+                    
+                    const setup = () => {
+                        line1.style.visibility = 'visible';
+                        bottomCross.style.visibility = 'visible';
+
+                        setTimeout(() => {
+                            line2.style.visibility = 'visible';
+
+                            setTimeout(() => {
+                                options.style.visibility = 'visible';
+                                document.querySelectorAll('.option').forEach(option => {
+                                    option.onclick = (e) => {
+                                        e.preventDefault();
+                                        // O destino "nona.html" foi substituído por uma volta ao "menu"
+                                        gotoNext('menu'); 
+                                    };
+                                });
+                            }, 4000);
+                        }, 4000);
+                    };
+                    setTimeout(setup, 3000);
+                }
+            }
+        };
+
+        // --- Função Principal para Mudar de Página ---
+        function changePage(pageId) {
+            currentPage = pageId;
+            const page = pages[pageId];
+
+            if (!page) {
+                console.error(`Página ${pageId} não encontrada.`);
+                return;
+            }
+
+            // 1. Limpa tudo e aplica a classe de corpo correta
+            appContainer.innerHTML = page.content;
+            document.body.className = page.bodyClass;
+            
+            // 2. Esconde elementos globais por padrão
+            settingsBtn.style.display = 'none';
+            copyrightText.style.display = 'none';
+            prayerPopup.style.display = 'none';
+            bottomCross.style.display = 'none';
+
+            // 3. Executa o script específico da página
+            if (page.script) {
+                // Passa a função changePage (como gotoNext) para o script da página
+                page.script(changePage);
+            }
+        }
+
+        // Inicia a aplicação na primeira página
+        document.addEventListener('DOMContentLoaded', () => {
+            changePage('terminal');
+        });
+
+    </script>
+
+</body>
+</html>
